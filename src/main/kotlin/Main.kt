@@ -1,78 +1,20 @@
 package de.deaddoctor
 
-import java.io.File
+// Notes: Game #247 crashed and simon as survivor might have been counted as a win
 
-const val prefix = "MoreSidemen Among Us"
+// Ideas:
+//  - All statistics per game played (e.g. voted out count)
+//  - Probability of vote out after self report
+//  - Change in probabilities after self report
+
 fun main() {
-    val gamesTable = readTable("Games")
-    val games = gamesTable.body.map {
-        val playerInfo = parsePlayerInfo(it[4].removeSurrounding("\""))
-        Game(it[0].toInt(), it[1], Role.parse(it[2]), it[3], playerInfo.players, playerInfo.totalTasks, playerInfo.completedTasks)
-    }
-    println(games)
-}
+    val games = parseGames()
 
-fun readTable(table: String) = CSV(File("$prefix - $table.csv").readText())
-
-class CSV(private val text: String) {
-    val head: List<String>
-    val body: List<List<String>>
-
-    init {
-        head = parseLine()
-        val lines = mutableListOf<List<String>>()
-        while (!finished) {
-            lines.add(parseLine())
-        }
-        body = lines
-    }
-
-    private var i = 0
-
-    private val current get() = text[i]
-    private fun consume() = text[i++]
-    private val finished
-        get() = i >= text.length
-
-    private fun parseLine(): List<String> {
-        val result = mutableListOf<String>()
-        do {
-            result.add(parseValue())
-        } while (!finished && consume() != '\n')
-        return result
-    }
-
-    private fun parseValue(): String {
-        var result = ""
-        var stringLiteral = false
-        while (!finished) {
-            when {
-                current == '"' -> stringLiteral = !stringLiteral
-                !stringLiteral && (current == '\n' || current == ',') -> break
-            }
-            result += consume()
-        }
-        return result
-    }
-}
-
-data class PlayerInfo(val players: Map<Player, Role>, val totalTasks: Int?, val completedTasks: Map<Player, Int>)
-
-fun parsePlayerInfo(playersInfoValue: String): PlayerInfo {
-    val playersInfo = playersInfoValue.split(',')
-    val players = mutableMapOf<Player, Role>()
-    var totalTasks: Int? = null
-    val completedTasks = mutableMapOf<Player, Int>()
-    for (playerInfo in playersInfo) {
-        val parts = playerInfo.split(" - ")
-        val name = parts[0]
-        players[name] = Role.parse(parts[1])
-        if (parts.size == 3) {
-            val tasks = parts[2].removeSurrounding("(", ")").split("/").map(String::toInt)
-            if (totalTasks != null && totalTasks != tasks[1]) throw IllegalArgumentException("Different total task values in a single game: $totalTasks != ${tasks[1]}")
-            totalTasks = tasks[1]
-            completedTasks[name] = tasks[0]
-        }
-    }
-    return PlayerInfo(players, totalTasks, completedTasks)
+    val player = "Ethan"
+    val wonGames = games.filter { it.played(player) && it.won(player) }
+    val lostGames = games.filter { it.played(player) && !it.won(player) }
+    println(wonGames.size)
+    println(wonGames.filter { it.getRole(player) != Role.CREWMATE || it.winner != Team.CREWMATE }.filter { it.getRole(player) != Role.IMPOSTER || it.winner != Team.IMPOSTER }.joinToString("\n") { "[${it.id}] ${it.getRole(player)} -> ${it.winner} (${it.link})" })
+    println(lostGames.size)
+    println(lostGames.filter { it.getRole(player) != Role.CREWMATE || it.winner != Team.IMPOSTER }.filter { it.getRole(player) != Role.IMPOSTER || it.winner != Team.CREWMATE }.joinToString("\n") { "[${it.id}] ${it.getRole(player)} -x ${it.winner} (${it.link})" })
 }
